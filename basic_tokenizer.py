@@ -5,13 +5,27 @@ def get_stats(tokens):
         pairs[pair] = pairs.get(pair, 0) + 1
     return pairs
 
+def merge(tokens, pair, idx):
+    updated_tokens = []
+    (p1,p2) = pair
+
+    j = 0
+    while j < len(tokens):
+        if j < len(tokens) - 1 and tokens[j] == p1 and tokens[j+1] == p2:
+            updated_tokens.append(idx)
+            j += 2
+        else:
+            updated_tokens.append(tokens[j])
+            j += 1
+
+    return updated_tokens
+
 class BasicTokenizer():
     def __init__(self):
         self.merges = {}
         self.vocab = {idx: bytes([idx]) for idx in range(256)}
     def train(self, text, vocab_size, verbose=False):
-        tokens = text.encode(encoding="utf-8", errors="ignore")
-        tokens = list(map(int, tokens))
+        tokens = list(text.encode("utf-8"))
 
         for i in range(vocab_size - len(self.vocab)):
             pairs = get_stats(tokens)
@@ -19,25 +33,37 @@ class BasicTokenizer():
             # its better to just find the max of the keys instead of sorting lol -- will fix
             pairs = {k: v for k, v in sorted(pairs.items(), key=lambda item: item[1], reverse=True)}
             top_pair = next(iter(pairs.keys()))
+            idx = 256 + i
+            
+            tokens = merge(tokens, top_pair, idx)
 
-            updated_tokens = []
-
-            j = 0
-            while j < len(tokens):
-                if j < len(tokens) - 1 and tokens[j] == top_pair[0] and tokens[j+1] == top_pair[1]:
-                    updated_tokens.append(256 + i)
-                    j += 2
-                else:
-                    updated_tokens.append(tokens[j])
-                    j += 1
-
-            tokens = updated_tokens
             self.merges[256 + i] = top_pair
 
+        # add to the vocabulary the new ids
+        for idx, (p0, p1) in self.merges.items():
+                self.vocab[idx] = self.vocab[p0] + self.vocab[p1]
+
     def encode(self, text):
-        pass
+        tokens = list(text.encode("utf-8"))
+        
+        while len(tokens) >= 2:
+            pairs = get_stats(tokens)
+            min_pair = min(pairs, key=lambda p: self.merges.get(p, float('inf'))) # that's very nice
+
+            if min_pair not in self.merges:
+                break
+            idx = self.merges[min_pair]
+            tokens = merge(tokens, min_pair, idx)
+        
+        return tokens
+
+        
     def decode(self, ids):
-        pass
+        print(self.vocab)
+        tokens = b"".join(self.vocab[idx] for idx in ids)
+        text = tokens.decode("utf-8", errors="replace")
+        return text
+        
 
 
 # copied text from karpathy's lecture so i know my stuff works
@@ -48,6 +74,6 @@ tokenizer.train(text, 276)
 
 print(tokenizer.merges)
 
-# valtext = "Many common characters, including numerals, punctuation, and other symbols, are unified within the standard and are not treated as specific to any given writing system. Unicode encodes thousands of emoji, with the continued development thereof conducted by the Consortium as a part of the standard.[4] Moreover, the widespread adoption of Unicode was in large part responsible for the initial popularization of emoji outside of Japan. Unicode is ultimately capable of encoding more than 1.1 million characters."
-# valtext2 = tokenizer.decode(tokenizer.encode(valtext))
-# print(valtext2 == valtext)
+valtext = "Many common characters, including numerals, punctuation, and other symbols, are unified within the standard and are not treated as specific to any given writing system. Unicode encodes thousands of emoji, with the continued development thereof conducted by the Consortium as a part of the standard.[4] Moreover, the widespread adoption of Unicode was in large part responsible for the initial popularization of emoji outside of Japan. Unicode is ultimately capable of encoding more than 1.1 million characters."
+valtext2 = tokenizer.decode(tokenizer.encode(valtext))
+print(valtext2 == valtext)
