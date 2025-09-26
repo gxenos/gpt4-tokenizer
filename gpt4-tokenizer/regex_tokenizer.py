@@ -88,7 +88,7 @@ print(valtext2 == valtext)
 
 tokenizer = RegexTokenizer()
 
-with open('./tests/taylor_swift.txt') as f:
+with open('../tests/taylor_swift.txt') as f:
     text = f.read()
     tokenizer = RegexTokenizer()
     tokenizer.train(text, 276, verbose=True)
